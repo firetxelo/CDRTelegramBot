@@ -2,7 +2,7 @@ Simple projetc to study python.
 
 This is a bot that receive commands via Telegram and execute querys on a Zabbix Server.
 
-You can check your active problems, viu graphs and more.
+You can check your active problems, view graphs and more.
 
 Instalation:
 
