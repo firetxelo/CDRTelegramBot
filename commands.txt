@@ -1,0 +1,17 @@
+list_hostgroup: List all hostgroups
+
+list_hosts <hostgroupid>: List all hosts in a hostgroup. If no hostgroup informed, that execute list_hostgroup.
+
+list_problems_by_host <hostid>: List all active problems on a host.
+
+detail_items_with_problem_id <problemid>: List all details of items in a problem. If no id informed, then return every problem whith its id.
+
+detail_items_with_graph <problemid>: Send graph for every item relacted to a problem informed.
+
+send_graph <itemid> <time- 1h, 3h, 1d... etc> : Send a graph of a item informed in <itemid>. The graph will show the time in <time> until now. 
+1h - last hour
+3h - last 3 hours
+1d - last day
+3d - last 3 days
+
+ 
