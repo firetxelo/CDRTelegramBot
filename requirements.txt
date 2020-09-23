@@ -1,0 +1,6 @@
+python-telegram-bot
+py-zabbix
+os
+functools
+datetime
+pybix
