@@ -1,20 +1,18 @@
 import os
 from functools import wraps
-from telegram.ext import Updater
-from telegram.ext import CommandHandler
-from telegram.ext import Filters
-from telegram.ext import MessageHandler
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, ConversationHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from botconf import main as config_bot
-from ZBXfunctions import zbx_list_hostgroup
-from ZBXfunctions import zbx_list_hosts_in_group
-from ZBXfunctions import zbx_list_problems_by_hostid
-from ZBXfunctions import get_graph_by_item_id
-from ZBXfunctions import detail_items_related_to_problem
-from ZBXfunctions import list_items_related_to_problem
-from ZBXfunctions import get_item_name
+from ZBXfunctions import problem_by_severity, get_problem_detail, list_all_items_problem, item_detail
+from ZBXfunctions import get_problem_host, problem_detail, item_graph
+import logging
 
 
-ADMINS = [111111111,22222222,3333333]
+ADMINS = [111111111111,22222222222222,33333333333]
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+logger = logging.getLogger(__name__)
 
 
 def restricted(func):
@@ -30,86 +28,31 @@ def restricted(func):
 
 
 @restricted
-def start(update, context):
-    message = 'Seja bem vindo'
-    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+def active_problems(update, context):
+    user = update.message.from_user
+    logger.info(f"User {user.first_name} started the conversation")
+    problems = problem_by_severity()
+    keyboard = []
+    for problem in problems:
+        name = get_problem_detail(problem)
+        hostname = get_problem_host(problem)
+        objectid = problem
+        list = [InlineKeyboardButton(f"{hostname} - {name}", callback_data=f"{objectid}")]
+        keyboard.append(list)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text(f'Hello, {user.first_name}. Tap a problem to view it details...', reply_markup=reply_markup)
 
-
-@restricted
-def echo(update, context):
-    message = 'echo'
-    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
-
-
-@restricted
-def unknown(update, context):
-    message = 'unknown'
-    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
-
-
-@restricted
-def list_hostgroup(update, context):
-    message = zbx_list_hostgroup()
-    context.bot.send_message(chat_id=update.message.chat_id, text=message)
-
-@restricted
-def list_hosts(update, context):
-    id = 0
-    if context.args:
-        id = context.args[0]
-    message = zbx_list_hosts_in_group(id)
-    context.bot.send_message(chat_id=update.message.chat_id, text=message)
-
-@restricted
-def list_problems_by_host(update, context):
-    id = 0
-    if context.args:
-        id = context.args[0]
-    message = zbx_list_problems_by_hostid(id)
-    context.bot.send_message(chat_id=update.message.chat_id, text=message)
-
-
-@restricted
-def send_graph(update, context):
-    message = "Informe o ID do item"
-    if len(context.args) == 2:
-        itemid = context.args[0]
-        time = context.args[1]
-        message = get_graph_by_item_id(itemid, time)
-        context.bot.send_photo(chat_id=update.message.chat_id, photo=open(f'{message}', 'rb'))
-
-    elif len(context.args) == 1:
-        itemid = context.args[0]
-        message = get_graph_by_item_id(itemid)
-        context.bot.send_photo(chat_id=update.message.chat_id, photo=open(f'{message}', 'rb'))
-    else:
-        context.bot.send_message(chat_id=update.message.chat_id, text=message)
-
-
-@restricted
-def detail_items_with_problem_id(update, context):
-    id = 0
-    if context.args:
-        id = context.args[0]
-    message = detail_items_related_to_problem(id)
-    context.bot.send_message(chat_id=update.message.chat_id, text=message)
-
-
-@restricted
-def detail_items_with_graph(update, context):
-    message = "Informe o ID do item"
-    if context.args:
-        id = context.args[0]
-        listitems = list_items_related_to_problem(id)
-        for item in listitems:
-            message = get_item_name(item)
-            context.bot.send_message(chat_id=update.message.chat_id, text=message)
-            photo = get_graph_by_item_id(item)
-            context.bot.send_photo(chat_id=update.message.chat_id, photo=open(f'{photo}', 'rb'))
-    else:
-        context.bot.send_message(chat_id=update.message.chat_id, text=message)
-
-
+def button(update,context):
+    query = update.callback_query
+    query.answer()
+    itemlist = list_all_items_problem(int(query.data))
+    problemtext = problem_detail(query.data)
+    context.bot.send_message(chat_id=query.message.chat_id, text=problemtext)
+    for item in itemlist:
+        text = item_detail(item)
+        context.bot.send_message(chat_id=query.message.chat_id, text=text)
+        photo = item_graph(item)
+        context.bot.send_photo(chat_id=query.message.chat_id, photo=open(f'{photo}', 'rb'))
 
 token = os.getenv('TGTOKEN')
 
@@ -118,13 +61,10 @@ def main():
     print(conf)
     updater = Updater(token=token, use_context=True)
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler('start', start))
-    dispatcher.add_handler(CommandHandler('list_hostgroup', list_hostgroup))
-    dispatcher.add_handler(CommandHandler('list_hosts', list_hosts))
-    dispatcher.add_handler(CommandHandler('list_problems_by_host', list_problems_by_host))
-    dispatcher.add_handler(CommandHandler('detail_items_with_problem_id', detail_items_with_problem_id))
-    dispatcher.add_handler(CommandHandler('detail_items_with_graph', detail_items_with_graph))
-    dispatcher.add_handler(CommandHandler('send_graph', send_graph))
+    dispatcher.add_handler(CommandHandler('active_problems', active_problems))
+    dispatcher.add_handler(CallbackQueryHandler(button))
+
+
     updater.start_polling()
     updater.idle()
 
