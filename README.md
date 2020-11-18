@@ -18,7 +18,6 @@ Instalation:
 
 
 
-New features will be added in the project every monday.
 
 
 Commands.txt have a little description about commands that the bot can understand.
